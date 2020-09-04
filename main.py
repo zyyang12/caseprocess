@@ -34,47 +34,61 @@ def read_excel(filename):
     '''
     提取excel文件数据
     '''
-    datas = []
+    datasdict_list = []
+    dataslist_list = []
+    title_list = []
     wb = load_workbook(filename)
     for sheetname in wb.sheetnames:
         #datas[sheetname] = []
         top_flag = True
         title_list = []
-        data_list = []
+        datadict_list = []
+        datalist_list = []
         for row in wb[sheetname].rows:
-            data_dict = OrderedDict()
+            #data_dict = OrderedDict()
+            data_list = []
             if top_flag:
                 for cell in row:
                     title_list.append(cell.value)
                 top_flag = False
             else:
+                data_dict = OrderedDict()
+                data_list = []
                 for index in range(0, len(row)):
                     data_dict [title_list[index]] = row[index].value
-                data_list.append(data_dict)
-        datas.extend(data_list)
+                    data_list.append(row[index].value)
+                datadict_list.append(data_dict)
+                datalist_list.append(data_list)
+                #print(datadict_list)
+        datasdict_list.extend(datadict_list)
+        dataslist_list.extend(datalist_list)
     wb.close()
-    return datas
+    return datasdict_list, dataslist_list, title_list
 
-def write_excel(filename, datalist, flag):
+def write_excel(filename, datalist,titlelist, flag):
     '''
     将合并后的数据写入excel文件
     '''
     #print(datalist[0].keys())
     wb = Workbook()
     ws = wb.active
-    titlelist = []
+    #titlelist = []
     if flag == "1":
         for i in range(len(datalist)-1, -1,-1):
-            if datalist[i]["flag"] == 1:
+            if datalist[i][-1] == 1:
                 del datalist[i]
             else:
-                del datalist[i]["flag"]
+                del datalist[i][-1]
+    elif flag == "0":
+        titlelist.append("flag")
+    '''
     if (len(datalist)>0):
         titlelist = list(datalist[0].keys())
+    '''
     print(datalist)
     ws.append(titlelist)
     for i in range(len(datalist)):
-        ws.append(list(datalist[i].values()))
+        ws.append(datalist[i])
     wb.save(filename)
     wb.close()
 
@@ -85,6 +99,7 @@ def simplify(configdict):
     flag = configdict["rule"]["flag"]
     count = 0
     filedict = {}
+    filetitledict = {}
     datalist = []
     databaklist = []
     uidlist = []
@@ -94,8 +109,8 @@ def simplify(configdict):
         filelist = file.split("\\")
         filename = filelist[-1]
         uidlist = []
-        datas = read_excel(file)
-        datasbak = datas.copy()
+        datas, datasbak, titlelist = read_excel(file)
+        filetitledict[filename] = titlelist
         for i in range(len(datas)):
             datas[i]["index"] = i + count
             datas[i]["delindex"] = [i+count]
@@ -132,24 +147,18 @@ def simplify(configdict):
     for multi in multilist:
         #根据重复用例回推在原始列表中重复的用例索引
         delindexlist.extend(datalist[multi]["delindex"])
-    print(datalist)
-    print(databaklist)
-    print(delindexlist)
     for i in range(len(databaklist)):
-        del databaklist[i]["delindex"]
-        del databaklist[i]["index"]
-        del databaklist[i]["condition"]
         if i in delindexlist:
-            databaklist[i]["flag"] = 1
+            databaklist[i].append(1)
         else:
-            databaklist[i]["flag"] = ""
+            databaklist[i].append("")
     count_src = len(databaklist)
     count_del = len(delindexlist)
     count_dest = count_src - count_del
     for key in filedict.keys():
         filepath = configdict["directory"]["result"] + "/" + key
         print(filedict)
-        write_excel(filepath, databaklist[filedict[key][0]:filedict[key][1]], flag)
+        write_excel(filepath, databaklist[filedict[key][0]:filedict[key][1]],filetitledict[key], flag)
     print("###################result######################")
     print("原始用例条数：",count_src)
     print("删除用例条数：", count_del)
