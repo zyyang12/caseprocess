@@ -63,7 +63,7 @@ def write_excel(filename, datalist, flag):
     wb = Workbook()
     ws = wb.active
     titlelist = []
-    if flag:
+    if flag == "1":
         for i in range(len(datalist)-1, -1,-1):
             if datalist[i]["flag"] == 1:
                 del datalist[i]
