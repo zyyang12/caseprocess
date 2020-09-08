@@ -13,6 +13,8 @@ def readconfig():
     rule["function"] = parseconf.parseStr("rule", "function")
     rule["condition"] = parseconf.parseList("rule", "condition")
     rule["flag"] = parseconf.parseStr("rule", "flag")
+    rule["multiflag"] = parseconf.parseStr("rule", "multiflag")
+    rule["nullflag"] = parseconf.parseStr("rule", "nullflag")
     configdict ={"directory":directory, "rule":rule}
     return configdict
 
@@ -97,6 +99,8 @@ def simplify(configdict):
     files = getFilelist(configdict["directory"]["input"])
     conditions = configdict["rule"]["condition"]
     flag = configdict["rule"]["flag"]
+    multiflag = configdict["rule"]["multiflag"]
+    nullflag = configdict["rule"]["nullflag"]
     count = 0
     filedict = {}
     filetitledict = {}
@@ -118,6 +122,10 @@ def simplify(configdict):
             for condition in conditions:
                 tmp = tmp + str(datas[i][condition])
                 #将要比较的字段拼接在一起
+            if (nullflag == "0"):
+                # 去重参数为空时（第一个参数），不参与去重
+                if not datas[i][conditions[0]]:
+                    tmp = tmp + str(datas[i]["index"])
             datas[i]["condition"] = tmp
         datalist.extend(datas)
         databaklist.extend(datasbak)
@@ -146,7 +154,11 @@ def simplify(configdict):
     delindexlist = []
     for multi in multilist:
         #根据重复用例回推在原始列表中重复的用例索引
-        delindexlist.extend(datalist[multi]["delindex"])
+        if (multiflag == "1"):
+            delindexlist.extend(datalist[multi]["delindex"])
+        elif (len(datalist[multi]["delindex"]) == 1):
+            #多轮用例不进行去重
+            delindexlist.extend(datalist[multi]["delindex"])
     for i in range(len(databaklist)):
         if i in delindexlist:
             databaklist[i].append(1)
