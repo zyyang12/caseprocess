@@ -15,6 +15,7 @@ def readconfig():
     rule["flag"] = parseconf.parseStr("rule", "flag")
     rule["multiflag"] = parseconf.parseStr("rule", "multiflag")
     rule["nullflag"] = parseconf.parseStr("rule", "nullflag")
+    rule["singlefileflag"] = parseconf.parseStr("rule", "singlefileflag")
     configdict ={"directory":directory, "rule":rule}
     return configdict
 
@@ -93,14 +94,9 @@ def write_excel(filename, datalist,titlelist, flag):
         ws.append(datalist[i])
     wb.save(filename)
     wb.close()
+    return 0
 
-
-def simplify(configdict):
-    files = getFilelist(configdict["directory"]["input"])
-    conditions = configdict["rule"]["condition"]
-    flag = configdict["rule"]["flag"]
-    multiflag = configdict["rule"]["multiflag"]
-    nullflag = configdict["rule"]["nullflag"]
+def de_weight(filelist, conditions, flag, multiflag, nullflag,resultpath):
     count = 0
     filedict = {}
     filetitledict = {}
@@ -108,8 +104,8 @@ def simplify(configdict):
     databaklist = []
     uidlist = []
     conditionlist = []
-    print(files)
-    for file in files:
+    print(filelist)
+    for file in filelist:
         filelist = file.split("\\")
         filename = filelist[-1]
         uidlist = []
@@ -118,13 +114,18 @@ def simplify(configdict):
         for i in range(len(datas)):
             datas[i]["index"] = i + count
             datas[i]["delindex"] = [i+count]
+            #print(datas[i])
             tmp = ""
+            #print(conditions)
             for condition in conditions:
                 tmp = tmp + str(datas[i][condition])
+            #print(tmp)
                 #将要比较的字段拼接在一起
             if (nullflag == "0"):
                 # 去重参数为空时（第一个参数），不参与去重
                 if not datas[i][conditions[0]]:
+                    #print(datas[i][conditions[0]])
+                    #print(conditions[0])
                     tmp = tmp + str(datas[i]["index"])
             datas[i]["condition"] = tmp
         datalist.extend(datas)
@@ -168,15 +169,38 @@ def simplify(configdict):
     count_del = len(delindexlist)
     count_dest = count_src - count_del
     for key in filedict.keys():
-        filepath = configdict["directory"]["result"] + "/" + key
+        filepath = resultpath + "/" + key
         print(filedict)
         write_excel(filepath, databaklist[filedict[key][0]:filedict[key][1]],filetitledict[key], flag)
+    return count_src, count_del, count_dest
+
+
+def simplify(configdict):
+    files = getFilelist(configdict["directory"]["input"])
+    conditions = configdict["rule"]["condition"]
+    flag = configdict["rule"]["flag"]
+    multiflag = configdict["rule"]["multiflag"]
+    nullflag = configdict["rule"]["nullflag"]
+    resultpath = configdict["directory"]["result"]
+    singlefileflag = configdict["rule"]["singlefileflag"]
+    count_src = 0
+    count_del = 0
+    count_dest = 0
+    if (singlefileflag == "1"):
+        for file in files:
+            count_src_tmp, count_del_tmp, count_dest_tmp = de_weight([file], conditions, flag, multiflag, nullflag, resultpath)
+            count_src = count_src + count_src_tmp
+            count_del = count_del + count_del_tmp
+            count_dest = count_dest + count_dest_tmp
+    else:
+        count_src,count_del,count_dest = de_weight(files, conditions, flag, multiflag, nullflag,resultpath)
     print("###################result######################")
     print("原始用例条数：",count_src)
     print("删除用例条数：", count_del)
     print("剩余用例条数：", count_dest)
     print("###################result######################")
     return 0
+
 
 def inspect(configdict):
     print('请检查config.ini参数function设置是否正确!')
