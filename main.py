@@ -84,6 +84,14 @@ def write_excel(filename, datalist,titlelist, flag):
     wb = Workbook()
     ws = wb.active
     #titlelist = []
+    try:
+        index = titlelist.index("flag")
+        del titlelist[index]
+        for data in datalist:
+            del data[index]
+    except:
+        print("原测试集中flag标记已覆盖")
+
     if flag == "1":
         for i in range(len(datalist)-1, -1,-1):
             if datalist[i][-1] == 1:
@@ -92,10 +100,6 @@ def write_excel(filename, datalist,titlelist, flag):
                 del datalist[i][-1]
     elif flag == "0":
         titlelist.append("flag")
-    '''
-    if (len(datalist)>0):
-        titlelist = list(datalist[0].keys())
-    '''
     print(datalist)
     ws.append(titlelist)
     for i in range(len(datalist)):
@@ -245,12 +249,24 @@ def casebackfill(configdict):
                     count = count + 1
                 except:
                     valuelist.append(None)
-            valuelist[0] = "matched_regex"
+            valuelist[0] = "gram_variable_path"
             wbinput = load_workbook(inputfile)
             wsinput = wbinput.active
             max_column = wsinput.max_column
-            for i in range(len(valuelist)):
-                wsinput.cell(row=i+1, column=max_column+1, value=valuelist[i])
+            top_flag = True
+            title_list = []
+            for row in wsinput.rows:
+                if top_flag:
+                    for cell in row:
+                        title_list.append(cell.value)
+                    top_flag = False
+            try:
+                index = title_list.index("gram_variable_path")
+                for i in range(len(valuelist)):
+                    wsinput.cell(row=i+1, column=index+1, value=valuelist[i])
+            except:
+                for i in range(len(valuelist)):
+                    wsinput.cell(row=i+1, column=max_column+1, value=valuelist[i])
             wbinput.save(inputfile)
             wbinput.close()
         wb.close()
