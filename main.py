@@ -1,22 +1,30 @@
 from openpyxl import Workbook
 from openpyxl import load_workbook
 from collections import OrderedDict
+import os
+import json
 from parseconf import ParseConf
 from directory import Directory
 
 def readconfig():
     parseconf = ParseConf("config.ini")
-    directory = {}
-    rule = {}
-    directory["input"] = parseconf.parseStr("directory", "input")
-    directory["result"] = parseconf.parseStr("directory", "result")
-    rule["function"] = parseconf.parseStr("rule", "function")
-    rule["condition"] = parseconf.parseList("rule", "condition")
-    rule["flag"] = parseconf.parseStr("rule", "flag")
-    rule["multiflag"] = parseconf.parseStr("rule", "multiflag")
-    rule["nullflag"] = parseconf.parseStr("rule", "nullflag")
-    rule["singlefileflag"] = parseconf.parseStr("rule", "singlefileflag")
-    configdict ={"directory":directory, "rule":rule}
+    directory1 = {}
+    rule1 = {}
+    directory2 = {}
+    rule2 = {}
+    function = {}
+    directory1["input"] = parseconf.parseStr("directory1", "input")
+    directory1["result"] = parseconf.parseStr("directory1", "result")
+    function["function"] = parseconf.parseStr("function", "function")
+    rule1["condition"] = parseconf.parseList("rule1", "condition")
+    rule1["flag"] = parseconf.parseStr("rule1", "flag")
+    rule1["multiflag"] = parseconf.parseStr("rule1", "multiflag")
+    rule1["nullflag"] = parseconf.parseStr("rule1", "nullflag")
+    rule1["singlefileflag"] = parseconf.parseStr("rule1", "singlefileflag")
+    directory2["input"] = parseconf.parseStr("directory2", "input")
+    directory2["output"] = parseconf.parseStr("directory2", "output")
+    rule2["key"] = parseconf.parseStr("rule2", "key")
+    configdict ={"function":function,"directory1":directory1, "rule1":rule1, "directory2":directory2, "rule2":rule2}
     return configdict
 
 def getFilelist(path):
@@ -164,7 +172,7 @@ def de_weight(filelist, conditions, flag, multiflag, nullflag,resultpath):
         if i in delindexlist:
             databaklist[i].append(1)
         else:
-            databaklist[i].append("")
+            databaklist[i].append(None)
     count_src = len(databaklist)
     count_del = len(delindexlist)
     count_dest = count_src - count_del
@@ -176,13 +184,13 @@ def de_weight(filelist, conditions, flag, multiflag, nullflag,resultpath):
 
 
 def simplify(configdict):
-    files = getFilelist(configdict["directory"]["input"])
-    conditions = configdict["rule"]["condition"]
-    flag = configdict["rule"]["flag"]
-    multiflag = configdict["rule"]["multiflag"]
-    nullflag = configdict["rule"]["nullflag"]
-    resultpath = configdict["directory"]["result"]
-    singlefileflag = configdict["rule"]["singlefileflag"]
+    files = getFilelist(configdict["directory1"]["input"])
+    conditions = configdict["rule1"]["condition"]
+    flag = configdict["rule1"]["flag"]
+    multiflag = configdict["rule1"]["multiflag"]
+    nullflag = configdict["rule1"]["nullflag"]
+    resultpath = configdict["directory1"]["result"]
+    singlefileflag = configdict["rule1"]["singlefileflag"]
     count_src = 0
     count_del = 0
     count_dest = 0
@@ -201,6 +209,56 @@ def simplify(configdict):
     print("###################result######################")
     return 0
 
+def casebackfill(configdict):
+    inputpath = configdict["directory2"]["input"]
+    inputfilelist = getFilelist(inputpath)
+    outputpath = configdict["directory2"]["output"]
+    outputfilelist = getFilelist(inputpath)
+    key = configdict["rule2"]["key"]
+    count = 0
+    for inputfile in inputfilelist:
+        outputfile = inputfile.replace(inputpath,outputpath)
+        if os.path.exists(outputfile):
+            wb = load_workbook(outputfile)
+            ws = wb.active
+            title_list = []
+            top_flag = True
+            for row in ws.rows:
+                if top_flag:
+                    for cell in row:
+                        title_list.append(cell.value)
+                    top_flag = False
+            index = title_list.index(key)
+            valuelist = []
+            for cellObj in list(ws.columns)[index]:
+                #print(cellObj.value)
+                try:
+                    jsobject = json.loads(cellObj.value)
+                    value1 = jsobject.get("gram_variable_path")
+                    value2 = jsobject.get("matched_regex")
+                    if value1:
+                        valuelist.append(value1)
+                    elif value2:
+                        valuelist.append(value2)
+                    else:
+                        valuelist.append(None)
+                    count = count + 1
+                except:
+                    valuelist.append(None)
+            valuelist[0] = "matched_regex"
+            wbinput = load_workbook(inputfile)
+            wsinput = wbinput.active
+            max_column = wsinput.max_column
+            for i in range(len(valuelist)):
+                wsinput.cell(row=i+1, column=max_column+1, value=valuelist[i])
+            wbinput.save(inputfile)
+            wbinput.close()
+        wb.close()
+    print("###################result######################")
+    print("含文法路径用例条数：",count)
+    print("###################result######################")
+
+
 
 def inspect(configdict):
     print('请检查config.ini参数function设置是否正确!')
@@ -208,10 +266,10 @@ def inspect(configdict):
 def run():
     configdict = readconfig()
     function_dic = {
-        '0' : simplify,
-
+        '1' : simplify,
+        '2' : casebackfill,
     }
-    function_dic.get(configdict["rule"]["function"], inspect)(configdict)
+    function_dic.get(configdict["function"]["function"], inspect)(configdict)
 
 if __name__ == "__main__":
     run()
